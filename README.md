@@ -14,5 +14,12 @@
 ---
 
 ## 🚀 Current Status
-- Initial repository, still empty.  
-- Next steps: create main window, add **Add Game** button, and implement game launch functionality.
+- Main window created with **menu bar** (Import / Help).  
+- **Import → Local Game**: lets you add local executables; cover art is fetched from **RAWG API**.  
+- Games are saved persistently (JSON), avoiding duplicates.  
+- Each game in the list shows:  
+  - Cover image  
+  - Game name  
+  - **Launch button** (runs the executable)  
+  - **Delete button** (removes the game from the library).  
+- **Help → About** dialog with app info and translations (EN/ES).  
