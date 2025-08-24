@@ -1,11 +1,12 @@
 import os
+import subprocess
 from PyQt6.QtWidgets import (
     QMainWindow, QListWidget, QListWidgetItem,
     QPushButton, QVBoxLayout, QWidget,
-    QInputDialog, QMessageBox, QFileDialog, QApplication, QHBoxLayout, QLabel
+    QFileDialog, QHBoxLayout, QLabel, QMessageBox
 )
 from PyQt6.QtGui import QIcon, QPixmap, QFont
-from core.manager import load_settings, save_settings, resource_path, load_games, save_games
+from core.manager import resource_path, load_games, save_games
 from core.i18n import t
 from core.rawg import fetch_rawg_image
 import requests
@@ -26,13 +27,26 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout()
         layout.addWidget(self.games_list)
 
-        # Buttons
-        btn_add = QPushButton(t("button.add_game"))
-        btn_add.clicked.connect(self.add_game)
-        layout.addWidget(btn_add)
 
-        btn_launch = QPushButton(t("button.launch_game"))
-        layout.addWidget(btn_launch)
+        # Menu bar
+        menubar = self.menuBar()
+
+        # Import menu
+        import_menu = menubar.addMenu(t("menu.import"))
+        action_local = import_menu.addAction(t("menu.import_local"))
+        action_folder = import_menu.addAction(t("menu.import_folder"))
+        action_local.triggered.connect(self.add_game)
+        action_folder.triggered.connect(lambda: QMessageBox.information(
+            self, t("menu.folder"), t("feature_not_implemented")
+        ))
+
+        # Help menu
+        help_menu = menubar.addMenu(t("menu.help"))
+        action_about = help_menu.addAction(t("menu.about"))
+        action_about.triggered.connect(lambda: QMessageBox.information(
+            self, t("title.about"), "Avocado Game Launcher\nVersion 1.0\n\nDeveloped by tecomoavocados__"
+        ))
+        help_menu.addAction(action_about)
 
         # Central widget
         container = QWidget()
@@ -42,10 +56,10 @@ class MainWindow(QMainWindow):
         # Load games
         self.load_games_in_ui()
 
-
-        # Add Local Game
+    # --------------------------
+    # Add Local Game
+    # --------------------------
     def add_game(self):
-        """Add a local game by selecting an exe file and fetch RAWG cover."""
         file_path, _ = QFileDialog.getOpenFileName(
             self, t("button.add_game"), "", "Executables (*.exe)"
         )
@@ -72,13 +86,14 @@ class MainWindow(QMainWindow):
             save_games(unique_games)
             self.load_games_in_ui()
 
-
+    # --------------------------
+    # Load Games into UI
+    # --------------------------
     def load_games_in_ui(self):
-        """Load all games into the list widget, avoiding duplicates."""
         self.games_list.clear()
         self.games = load_games()
 
-        # Remove duplicates safely
+        # Remove duplicates by name
         seen_names = set()
         unique_games = []
         for g in self.games:
@@ -87,24 +102,25 @@ class MainWindow(QMainWindow):
                 seen_names.add(name)
                 unique_games.append(g)
 
-        # Only installed games
         installed_games = [g for g in unique_games if g.get("installed")]
         self.add_games_to_list(installed_games)
 
-
-
+    # --------------------------
+    # Add Games to List
+    # --------------------------
     def add_games_to_list(self, games):
-        """Add games to the list with custom widget (icon + name + delete button)."""
         self.games_list.clear()
 
         for g in games:
             name = g.get("name", "Unknown")
+            path = g.get("path")
             icon_url = g.get("icon")
 
             item_widget = QWidget()
             layout = QHBoxLayout()
             layout.setContentsMargins(5, 5, 5, 5)
 
+            # Game icon
             label_icon = QLabel()
             if icon_url:
                 try:
@@ -118,14 +134,19 @@ class MainWindow(QMainWindow):
                     print(f"Failed to load icon for {name}: {e}")
             layout.addWidget(label_icon)
 
+            # Game name
             label_name = QLabel(name)
-            font = QFont("Arial", 14)  
+            font = QFont("Arial", 14)
             label_name.setFont(font)
             layout.addWidget(label_name)
 
-            btn_delete = QPushButton()
-            btn_delete.setIcon(QIcon(resource_path("assets/icons/trash_red.png")))
-            btn_delete.setFixedSize(32, 32)
+            # Launch button
+            btn_launch = QPushButton(t("button.launch_game"))
+            btn_launch.clicked.connect(lambda checked, p=path: self.launch_game(p))
+            layout.addWidget(btn_launch)
+
+            # Delete button
+            btn_delete = QPushButton(t("button.delete"))
             btn_delete.clicked.connect(lambda checked, n=name: self.delete_game(n))
             layout.addWidget(btn_delete)
 
@@ -137,8 +158,21 @@ class MainWindow(QMainWindow):
             self.games_list.addItem(item)
             self.games_list.setItemWidget(item, item_widget)
 
+    # --------------------------
+    # Delete Game
+    # --------------------------
     def delete_game(self, game_name):
         current_games = load_games()
         updated_games = [g for g in current_games if g.get("name") != game_name]
         save_games(updated_games)
         self.load_games_in_ui()
+
+    # --------------------------
+    # Launch Game
+    # --------------------------
+    def launch_game(self, path):
+        if path and os.path.exists(path):
+            try:
+                subprocess.Popen(path, shell=True)
+            except Exception as e:
+                print(f"Failed to launch {path}: {e}")

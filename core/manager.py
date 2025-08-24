@@ -1,7 +1,6 @@
 import os, json
 import sys
 
-# Fixed folder for config (AppData in Windows, HOME/.avocados in other OS)
 CONFIG_DIR = os.path.join(os.getenv("APPDATA") or os.path.expanduser("~"), "Avocado Game Launcher")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "settings.json")
 GAMES_FILE = os.path.join(CONFIG_DIR, "games.json")
