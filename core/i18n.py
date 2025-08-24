@@ -16,6 +16,12 @@ TRANSLATIONS = {
         "feature_not_implemented": "Funcionalidad no implementada aún.",
         "menu.folder": "Importar carpeta.",
         "menu.import_folder": "Desde Carpeta",
+        "menu.settings": "Configuración",
+        "button.profile": "Mi Perfil",
+        "title.save": "Guardar",
+        "title.exit": "Salir",
+        "settings.saved": "Configuración guardada exitosamente, reinicie la aplicación si es necesario.",
+        "lang.title": "Idioma",
     },
     "en": {
         "app.title": "Avocado - Game Library Manager",
@@ -30,6 +36,12 @@ TRANSLATIONS = {
         "feature_not_implemented": "Feature not implemented yet.",
         "menu.folder": "Import folder.",
         "menu.import_folder": "From Folder",
+        "menu.settings": "Settings",
+        "button.profile": "My Profile",
+        "title.save": "Save",
+        "title.exit": "Exit",
+        "settings.saved": "Settings saved successfully, please restart the app if needed.",
+        "lang.title": "Language",
 
     },
 }
