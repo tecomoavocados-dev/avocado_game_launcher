@@ -5,15 +5,16 @@ from PyQt6.QtWidgets import (
     QPushButton, QVBoxLayout, QWidget,
     QFileDialog, QHBoxLayout, QLabel, QMessageBox
 )
-from PyQt6.QtGui import QIcon, QPixmap, QFont
+from PyQt6.QtGui import QIcon, QPixmap, QFont, QAction
 from core.manager import resource_path, load_games, save_games
 from core.i18n import t
 from core.rawg import fetch_rawg_image
 import requests
+from ui.settings_window import SettingsWindow
+
 
 
 class MainWindow(QMainWindow):
-
     def __init__(self):
         super().__init__()
         self.setWindowTitle(t("app.title"))
@@ -22,32 +23,63 @@ class MainWindow(QMainWindow):
         # Main icon
         self.setWindowIcon(QIcon(resource_path("assets/icon.ico")))
 
-        # Main layout
+        # Central widget
         self.games_list = QListWidget()
         layout = QVBoxLayout()
         layout.addWidget(self.games_list)
 
+        central_widget = QWidget()
+        central_widget.setLayout(layout)
+        self.setCentralWidget(central_widget)
 
         # Menu bar
         menubar = self.menuBar()
 
         # Import menu
         import_menu = menubar.addMenu(t("menu.import"))
-        action_local = import_menu.addAction(t("menu.import_local"))
-        action_folder = import_menu.addAction(t("menu.import_folder"))
+        action_local = QAction(t("menu.import_local"), self)
+        action_folder = QAction(t("menu.import_folder"), self)
+
         action_local.triggered.connect(self.add_game)
-        action_folder.triggered.connect(lambda: QMessageBox.information(
-            self, t("menu.folder"), t("feature_not_implemented")
-        ))
+        action_folder.triggered.connect(
+            lambda: QMessageBox.information(
+                self, t("menu.folder"), t("feature_not_implemented")
+            )
+        )
+
+        # Forzar alineación izquierda
+        import_menu.addAction(action_local)
+        import_menu.addAction(action_folder)
+        import_menu.setStyleSheet("QMenu::item { text-align: left; }")
+
+        # Settings menu
+        settings_menu = menubar.addMenu(t("menu.settings"))
+        settings_action = QAction(t("menu.settings"), self)
+        settings_action.triggered.connect(self.open_settings_window)
+        settings_menu.addAction(settings_action)
+        settings_menu.setStyleSheet("QMenu::item { text-align: left; }")
 
         # Help menu
         help_menu = menubar.addMenu(t("menu.help"))
-        action_about = help_menu.addAction(t("menu.about"))
-        action_about.triggered.connect(lambda: QMessageBox.information(
-            self, t("title.about"), "Avocado Game Launcher\nVersion 1.0\n\nDeveloped by tecomoavocados__"
-        ))
+        action_about = QAction(t("menu.about"), self)
+        action_about.triggered.connect(
+            lambda: QMessageBox.information(
+                self,
+                t("title.about"),
+                "Avocado Game Launcher\nVersion 1.0\n\nDeveloped by tecomoavocados__"
+            )
+        )
         help_menu.addAction(action_about)
+        help_menu.setStyleSheet("QMenu::item { text-align: left; }")
 
+
+        # Icons and buttons
+        action_local.setIcon(QIcon(resource_path("assets/icons/file.png")))
+        action_folder.setIcon(QIcon(resource_path("assets/icons/folder.png")))
+        settings_action.setIcon(QIcon(resource_path("assets/icons/settings.png")))
+        action_about.setIcon(QIcon(resource_path("assets/icons/about.png")))
+        
+        
         # Central widget
         container = QWidget()
         container.setLayout(layout)
@@ -176,3 +208,11 @@ class MainWindow(QMainWindow):
                 subprocess.Popen(path, shell=True)
             except Exception as e:
                 print(f"Failed to launch {path}: {e}")
+
+
+    # --------------------------
+    # Open Settings Window
+    # --------------------------
+    def open_settings_window(self):
+        settings_window = SettingsWindow()
+        settings_window.exec()
