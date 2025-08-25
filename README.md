@@ -12,6 +12,13 @@
 - Cross-platform interface: Windows, Linux, and Mac.  
 
 ---
+## :camera_flash: Screenshots
+![Select Language](assets/screenshots/select_language.png)
+![Main Window](assets/screenshots/main_window.png)
+![Settings](assets/screenshots/settings.png)
+![About](assets/screenshots/about.png)
+
+---
 
 ## 🚀 Current Status
 - Main window created with **menu bar** (Import / Help).  
@@ -23,3 +30,8 @@
   - **Launch button** (runs the executable)  
   - **Delete button** (removes the game from the library).  
 - **Help → About** dialog with app info and translations (EN/ES).  
+
+
+## Download
+
+Get the latest version here: [Avocado Game Launcher Latest Release](https://github.com/tecomoavocados-dev/avocado_game_launcher/releases/latest)
