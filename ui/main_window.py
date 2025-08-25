@@ -39,25 +39,18 @@ class MainWindow(QMainWindow):
         import_menu = menubar.addMenu(t("menu.import"))
         action_local = QAction(t("menu.import_local"), self)
         action_folder = QAction(t("menu.import_folder"), self)
-
         action_local.triggered.connect(self.add_game)
-        action_folder.triggered.connect(
-            lambda: QMessageBox.information(
-                self, t("menu.folder"), t("feature_not_implemented")
-            )
-        )
+        action_folder.triggered.connect(self.open_folder)
 
         # Forzar alineación izquierda
         import_menu.addAction(action_local)
         import_menu.addAction(action_folder)
-        import_menu.setStyleSheet("QMenu::item { text-align: left; }")
 
         # Settings menu
         settings_menu = menubar.addMenu(t("menu.settings"))
         settings_action = QAction(t("menu.settings"), self)
         settings_action.triggered.connect(self.open_settings_window)
         settings_menu.addAction(settings_action)
-        settings_menu.setStyleSheet("QMenu::item { text-align: left; }")
 
         # Help menu
         help_menu = menubar.addMenu(t("menu.help"))
@@ -70,7 +63,10 @@ class MainWindow(QMainWindow):
             )
         )
         help_menu.addAction(action_about)
-        help_menu.setStyleSheet("QMenu::item { text-align: left; }")
+        report_issue_action = QAction(t("menu.report_issue"), self)
+        
+        help_menu.addAction(report_issue_action)
+ 
 
 
         # Icons and buttons
@@ -78,6 +74,7 @@ class MainWindow(QMainWindow):
         action_folder.setIcon(QIcon(resource_path("assets/icons/folder.png")))
         settings_action.setIcon(QIcon(resource_path("assets/icons/settings.png")))
         action_about.setIcon(QIcon(resource_path("assets/icons/about.png")))
+        report_issue_action.setIcon(QIcon(resource_path("assets/icons/report_problem.png")))
         
         
         # Central widget
@@ -136,6 +133,48 @@ class MainWindow(QMainWindow):
 
         installed_games = [g for g in unique_games if g.get("installed")]
         self.add_games_to_list(installed_games)
+
+
+    # --------------------------
+    # Open Folder to Import Games
+    # --------------------------
+    def open_folder(self):
+        folder_path = QFileDialog.getExistingDirectory(self, t("button.import_folder"))
+        if folder_path:
+            exe_files = []
+            # Folder traversal to find .exe files
+            for root, dirs, files in os.walk(folder_path):
+                for file in files:
+                    if file.lower().endswith(".exe"):
+                        # Filter out common non-game executables
+                        excluded_keywords = [
+                            "unity", "unreal", "editor", "tool", "setup", "installer", "hand", "config", "launcher", "VC_redist.x64", "VC_redistx.86", "dxwebsetup", "dotnet", "steam", "epicgames", "gog", "origin", "ubisoft", "battle.net", "UnityCrashHandler64", "UnrealCEFSubProcess64", "EpicWebHelper", "EpicGamesLauncher", "GOG Galaxy", "Origin", "UbisoftGameLauncher", "Battle.net"
+                        ]
+                        file_lower = file.lower()
+                        if any(keyword in file_lower for keyword in excluded_keywords):
+                            continue
+                        exe_files.append(os.path.join(root, file))
+            if not exe_files:
+                QMessageBox.information(self, t("title.info"), t("msg.no_exe_found"))
+                return
+            current_games = load_games()
+            for exe_path in exe_files:
+                name = os.path.splitext(os.path.basename(exe_path))[0]
+                icon_url = fetch_rawg_image(name)
+                game_data = {
+                    "name": name,
+                    "path": exe_path,
+                    "installed": True,
+                    "icon": icon_url
+                }
+                current_games.append(game_data)
+            # Eliminar duplicados por path
+            seen_paths = set()
+            unique_games = [
+                g for g in current_games if not (g.get("path") in seen_paths or seen_paths.add(g.get("path")))
+            ]
+            save_games(unique_games)
+            self.load_games_in_ui()
 
     # --------------------------
     # Add Games to List

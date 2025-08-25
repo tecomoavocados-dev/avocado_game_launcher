@@ -22,6 +22,7 @@ TRANSLATIONS = {
         "title.exit": "Salir",
         "settings.saved": "Configuración guardada exitosamente, reinicie la aplicación si es necesario.",
         "lang.title": "Idioma",
+        "menu.report_issue": "Reportar un problema",
     },
     "en": {
         "app.title": "Avocado - Game Library Manager",
@@ -42,6 +43,7 @@ TRANSLATIONS = {
         "title.exit": "Exit",
         "settings.saved": "Settings saved successfully, please restart the app if needed.",
         "lang.title": "Language",
+        "menu.report_issue": "Report an issue",
 
     },
 }
