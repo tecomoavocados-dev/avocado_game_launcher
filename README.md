@@ -12,6 +12,7 @@
 - Cross-platform interface: Windows, Linux, and Mac.  
 
 ---
+
 ## :camera_flash: Screenshots
 ![Select Language](assets/screenshots/select_language.png)
 ![Main Window](assets/screenshots/main_window.png)
