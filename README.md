@@ -105,5 +105,4 @@ All persistent data is stored in the user’s Roaming folder:
 
 ## 📝 License
 
-MIT License.
-Feel free to use and modify this project!
+Apache License 2.0
