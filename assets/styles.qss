@@ -1,0 +1,110 @@
+QListWidget {
+    background-color: #1e1e1e;
+    border: 1px solid #333333;
+    border-radius: 6px;
+    padding: 4px;
+    color: #e0e0e0;
+}
+QListWidget::item {
+    padding: 8px;
+}
+QListWidget::item:selected {
+    background-color: #2e7d32;
+    color: #ffffff;
+}
+
+QFrame#InfoPanel {
+    background-color: #1a1a1a;
+    border: 1px solid #333333;
+    border-radius: 8px;
+    padding: 12px;
+}
+
+QLabel#Title {
+    font-size: 18px;
+    font-weight: bold;
+    color: #2e7d32;
+}
+
+QLabel#TitleYourGames {
+    font-size: 16px;
+    font-weight: bold;
+    color: #ffffff;
+}
+
+QListWidget#GamesList {
+    background-color: #1a1a1a;
+    border: 1px solid #333333;
+    border-radius: 8px;
+    padding: 6px;
+    color: #e0e0e0;
+    font-size: 14px;
+}
+QListWidget#GamesList::item:selected {
+    background-color: #2e7d32;
+    color: #ffffff;
+}
+
+QPushButton#RefreshButton {
+    background-color: #2ecc71;
+    color: white;
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-weight: bold;
+}
+
+QPushButton#RefreshButton:hover {
+    background-color: #27ae60;
+}
+
+QPushButton#RemoveButton {
+    background-color: #e74c3c;
+    color: white;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-weight: bold;
+}
+
+QPushButton#RemoveButton:hover {
+    background-color: #c0392b;
+}
+
+#GameTitle {
+    font-size: 26px;
+    font-weight: bold;
+    color: #ffffff;
+    padding: 10px 0;
+}
+
+#GameCover {
+    border-radius: 12px;
+    margin: 10px 0;
+    width: 890;
+}
+
+#GameDescription {
+    font-size: 14px;
+    color: #dddddd;
+    line-height: 1.4em;
+    padding: 6px;
+}
+
+#InfoBox {
+    background-color: #1e1e1e;
+    border: 1px solid #444444;
+    border-radius: 8px;
+    padding: 8px;
+    margin-top: 10px;
+}
+
+#GameMeta {
+    font-size: 13px;
+    color: #bbbbbb;
+    margin: 2px 0;
+}
+
+#ErrorLabel {
+    font-size: 14px;
+    color: #ff5555;
+    font-style: italic;
+}

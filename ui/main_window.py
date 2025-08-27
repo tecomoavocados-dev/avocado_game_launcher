@@ -1,36 +1,32 @@
-import os
-import subprocess
-from PyQt6.QtWidgets import (
-    QMainWindow, QListWidget, QListWidgetItem,
-    QPushButton, QVBoxLayout, QWidget,
-    QFileDialog, QHBoxLayout, QLabel, QMessageBox
-)
-from PyQt6.QtGui import QIcon, QPixmap, QFont, QAction
-from core.manager import resource_path, load_games, save_games
+from PyQt6.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QListWidget, QLabel, QVBoxLayout, QFrame, QInputDialog, QMessageBox, QListWidgetItem, QPushButton, QSystemTrayIcon, QApplication, QMenu
+from PyQt6.QtGui import QAction, QIcon, QPixmap
+from PyQt6.QtCore import Qt
 from core.i18n import t
-from core.rawg import fetch_rawg_image
-import requests
+from core.manager import resource_path, import_games_from_steam, load_settings, quick_refresh, save_settings
+import os, requests
+from core.db import load_games, init_db
+from ui.about_dialog import AboutDialog
 from ui.settings_window import SettingsWindow
-
 
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+
+        init_db()
+        
+        # Window 
         self.setWindowTitle(t("app.title"))
-        self.setGeometry(200, 200, 1080, 700)
+        self.setGeometry(200, 200, 1400, 700)
+        self.setFixedSize(1500, 800)
+
+
+        # Setup system tray
+        self.tray_icon = QSystemTrayIcon(QIcon(resource_path("assets/icon.ico")), self)
+        self.setup_tray()
 
         # Main icon
         self.setWindowIcon(QIcon(resource_path("assets/icon.ico")))
-
-        # Central widget
-        self.games_list = QListWidget()
-        layout = QVBoxLayout()
-        layout.addWidget(self.games_list)
-
-        central_widget = QWidget()
-        central_widget.setLayout(layout)
-        self.setCentralWidget(central_widget)
 
         # Menu bar
         menubar = self.menuBar()
@@ -38,13 +34,17 @@ class MainWindow(QMainWindow):
         # Import menu
         import_menu = menubar.addMenu(t("menu.import"))
         action_local = QAction(t("menu.import_local"), self)
-        action_folder = QAction(t("menu.import_folder"), self)
-        action_local.triggered.connect(self.add_game)
-        action_folder.triggered.connect(self.open_folder)
-
-        # Forzar alineación izquierda
+        action_local.triggered.connect(lambda: print("Hola"))
         import_menu.addAction(action_local)
-        import_menu.addAction(action_folder)
+
+        action_steam = QAction("Steam", self)  
+        action_steam.setIcon(QIcon(resource_path("assets/icons/steam.ico")))
+
+        # connect to steam
+        action_steam.triggered.connect(self.handle_import_steam)
+
+        import_menu.addAction(action_steam)
+
 
         # Settings menu
         settings_menu = menubar.addMenu(t("menu.settings"))
@@ -55,203 +55,299 @@ class MainWindow(QMainWindow):
         # Help menu
         help_menu = menubar.addMenu(t("menu.help"))
         action_about = QAction(t("menu.about"), self)
-        action_about.triggered.connect(
-            lambda: QMessageBox.information(
-                self,
-                t("title.about"),
-                "Avocado Game Launcher\nVersion 1.0\n\nDeveloped by tecomoavocados__"
-            )
-        )
+        action_about.triggered.connect(lambda: AboutDialog().exec())
         help_menu.addAction(action_about)
         report_issue_action = QAction(t("menu.report_issue"), self)
+        report_issue_action.triggered.connect(
+            lambda: os.startfile("https://github.com/tecomoavocados-dev/issues/issues/new")
+        )
         
         help_menu.addAction(report_issue_action)
- 
 
 
-        # Icons and buttons
+        # Icons and Buttons
         action_local.setIcon(QIcon(resource_path("assets/icons/file.png")))
-        action_folder.setIcon(QIcon(resource_path("assets/icons/folder.png")))
         settings_action.setIcon(QIcon(resource_path("assets/icons/settings.png")))
         action_about.setIcon(QIcon(resource_path("assets/icons/about.png")))
         report_issue_action.setIcon(QIcon(resource_path("assets/icons/report_problem.png")))
-        
-        
-        # Central widget
-        container = QWidget()
-        container.setLayout(layout)
-        self.setCentralWidget(container)
 
-        # Load games
-        self.load_games_in_ui()
 
-    # --------------------------
-    # Add Local Game
-    # --------------------------
-    def add_game(self):
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, t("button.add_game"), "", "Executables (*.exe)"
+        central = QWidget()
+        self.setCentralWidget(central)
+
+        main_layout = QHBoxLayout(central)
+
+        # ---- Left column ----
+        left_layout = QVBoxLayout()
+
+        # Row: "Your Games" + Update button
+        title_row = QHBoxLayout()
+
+        title_games = QLabel(t("your.games"))
+        title_games.setObjectName("TitleYourGames")
+
+        self.refresh_btn = QPushButton("Update Library")
+        self.refresh_btn.setObjectName("RefreshButton")
+        self.refresh_btn.clicked.connect(self.refresh_library)
+
+        title_row.addWidget(title_games)
+        title_row.addStretch()
+        title_row.addWidget(self.refresh_btn)
+
+        left_layout.addLayout(title_row)
+
+        # Frame with game list
+        self.games_panel = QFrame()
+        self.games_panel.setObjectName("GamesPanel")
+        self.games_panel_layout = QVBoxLayout(self.games_panel)
+
+        self.games_list = QListWidget()
+        self.games_list.setObjectName("GamesList")
+        self.games_panel_layout.addWidget(self.games_list)
+
+        left_layout.addWidget(self.games_panel)
+
+        main_layout.addLayout(left_layout)
+
+
+
+        # ---- Right Column ----
+        right_layout = QVBoxLayout()
+
+        # Title
+        title_info = QLabel(t("information.games"))
+        title_info.setObjectName("Title")
+        right_layout.addWidget(title_info)
+        right_layout.addWidget(title_info, 0) 
+
+        # Information panel
+        self.info_panel = QFrame()
+        self.info_panel.setObjectName("InfoPanel")
+        info_layout = QVBoxLayout(self.info_panel)
+        right_layout.addWidget(self.info_panel, 1)
+
+        # Details
+        placeholder = QLabel(t("info.game"))
+        info_layout.addWidget(placeholder)
+
+        right_layout.addWidget(self.info_panel)
+
+        # ---- Add main layout ----
+        main_layout.addLayout(left_layout, 1)
+        main_layout.addLayout(right_layout, 3)
+
+
+        games = load_games()
+        self.populate_games(games)
+        self.games_list.itemClicked.connect(self.show_game_info)
+
+
+    def handle_import_steam(self):
+        """Triggered when user clicks 'Import from Steam'."""
+        username, ok = QInputDialog.getText(
+            self, t("import.steam"), t("steam.username")
         )
-        if file_path:
-            name = os.path.splitext(os.path.basename(file_path))[0]
-            icon_url = fetch_rawg_image(name)
+        if not ok or not username:
+            return
 
-            game_data = {
-                "name": name,
-                "path": file_path,
-                "installed": True,
-                "icon": icon_url
-            }
+        # Get games from Steam API
+        all_games = import_games_from_steam(username)
 
-            current_games = load_games()
-            current_games.append(game_data)
+        # Keep only installed ones
+        games = all_games
 
-            # Remove duplicates by path
-            seen_paths = set()
-            unique_games = [
-                g for g in current_games if not (g.get("path") in seen_paths or seen_paths.add(g.get("path")))
-            ]
-
-            save_games(unique_games)
-            self.load_games_in_ui()
-
-    # --------------------------
-    # Load Games into UI
-    # --------------------------
-    def load_games_in_ui(self):
-        self.games_list.clear()
-        self.games = load_games()
-
-        # Remove duplicates by name
-        seen_names = set()
-        unique_games = []
-        for g in self.games:
-            name = g.get("name")
-            if name and name not in seen_names:
-                seen_names.add(name)
-                unique_games.append(g)
-
-        installed_games = [g for g in unique_games if g.get("installed")]
-        self.add_games_to_list(installed_games)
+        self.populate_games(games)
+        QMessageBox.information(
+        self,
+        "Steam",
+        t("import.success").format(count=len(games))
+        )
 
 
-    # --------------------------
-    # Open Folder to Import Games
-    # --------------------------
-    def open_folder(self):
-        folder_path = QFileDialog.getExistingDirectory(self, t("button.import_folder"))
-        if folder_path:
-            exe_files = []
-            # Folder traversal to find .exe files
-            for root, dirs, files in os.walk(folder_path):
-                for file in files:
-                    if file.lower().endswith(".exe"):
-                        # Filter out common non-game executables
-                        excluded_keywords = [
-                            "unity", "unreal", "editor", "tool", "setup", "installer", "hand", "config", "launcher", "VC_redist.x64", "VC_redistx.86", "dxwebsetup", "dotnet", "steam", "epicgames", "gog", "origin", "ubisoft", "battle.net", "UnityCrashHandler64", "UnrealCEFSubProcess64", "EpicWebHelper", "EpicGamesLauncher", "GOG Galaxy", "Origin", "UbisoftGameLauncher", "Battle.net"
-                        ]
-                        file_lower = file.lower()
-                        if any(keyword in file_lower for keyword in excluded_keywords):
-                            continue
-                        exe_files.append(os.path.join(root, file))
-            if not exe_files:
-                QMessageBox.information(self, t("title.info"), t("msg.no_exe_found"))
-                return
-            current_games = load_games()
-            for exe_path in exe_files:
-                name = os.path.splitext(os.path.basename(exe_path))[0]
-                icon_url = fetch_rawg_image(name)
-                game_data = {
-                    "name": name,
-                    "path": exe_path,
-                    "installed": True,
-                    "icon": icon_url
-                }
-                current_games.append(game_data)
-            # Eliminar duplicados por path
-            seen_paths = set()
-            unique_games = [
-                g for g in current_games if not (g.get("path") in seen_paths or seen_paths.add(g.get("path")))
-            ]
-            save_games(unique_games)
-            self.load_games_in_ui()
-
-    # --------------------------
-    # Add Games to List
-    # --------------------------
-    def add_games_to_list(self, games):
+    def populate_games(self, games: list[dict]):
+        """Fill the game panel with imported games."""
         self.games_list.clear()
 
-        for g in games:
-            name = g.get("name", "Unknown")
-            path = g.get("path")
-            icon_url = g.get("icon")
+        for game in games:
+            item = QListWidgetItem(game['name'])
 
-            item_widget = QWidget()
-            layout = QHBoxLayout()
-            layout.setContentsMargins(5, 5, 5, 5)
+            cover = game.get("cover")
+            if cover and os.path.exists(cover):
+                pixmap = QPixmap(cover)
+                icon = QIcon(pixmap.scaled(64, 64))
+                item.setIcon(icon)
+            else:
+                print(f"[DEBUG] No local cover for {game['name']}")
 
-            # Game icon
-            label_icon = QLabel()
-            if icon_url:
-                try:
-                    response = requests.get(icon_url, timeout=5)
-                    response.raise_for_status()
-                    pixmap = QPixmap()
-                    if pixmap.loadFromData(response.content):
-                        pixmap = pixmap.scaled(64, 64)
-                        label_icon.setPixmap(pixmap)
-                except Exception as e:
-                    print(f"Failed to load icon for {name}: {e}")
-            layout.addWidget(label_icon)
-
-            # Game name
-            label_name = QLabel(name)
-            font = QFont("Arial", 14)
-            label_name.setFont(font)
-            layout.addWidget(label_name)
-
-            # Launch button
-            btn_launch = QPushButton(t("button.launch_game"))
-            btn_launch.clicked.connect(lambda checked, p=path: self.launch_game(p))
-            layout.addWidget(btn_launch)
-
-            # Delete button
-            btn_delete = QPushButton(t("button.delete"))
-            btn_delete.clicked.connect(lambda checked, n=name: self.delete_game(n))
-            layout.addWidget(btn_delete)
-
-            layout.addStretch()
-            item_widget.setLayout(layout)
-
-            item = QListWidgetItem()
-            item.setSizeHint(item_widget.sizeHint())
+            item.setData(1000, game)
             self.games_list.addItem(item)
-            self.games_list.setItemWidget(item, item_widget)
 
-    # --------------------------
-    # Delete Game
-    # --------------------------
-    def delete_game(self, game_name):
-        current_games = load_games()
-        updated_games = [g for g in current_games if g.get("name") != game_name]
-        save_games(updated_games)
-        self.load_games_in_ui()
+    def refresh_library(self):
+        """Update DB + UI without re-downloading existing covers."""
+        try:
+            settings = load_settings()
+            username = settings.get("username")
+            if not username:
+                QMessageBox.warning(self, "Error", "Set your Steam username in settings.")
+                return
 
-    # --------------------------
-    # Launch Game
-    # --------------------------
-    def launch_game(self, path):
-        if path and os.path.exists(path):
+            updated_games = quick_refresh(username)
+            self.populate_games(updated_games)
+            QMessageBox.information(self, "Library updated",
+                                    f"Found {len(updated_games)} games (changes applied).")
+        except Exception as e:
+            QMessageBox.critical(self, "Error while updating", str(e))
+
+    def show_game_info(self, item):
+        """Show selected game details in the right panel."""
+        game = item.data(1000)
+        appid = game["appid"]
+
+        from core.manager import fetch_game_info
+        details = fetch_game_info(appid)
+
+        layout = self.info_panel.layout()
+        for i in reversed(range(layout.count())):
+            widget = layout.itemAt(i).widget()
+            if widget:
+                widget.deleteLater()
+
+        if not details:
+            layout.addWidget(QLabel("No se pudo obtener información del juego."))
+            return
+
+        # ---- Title ----
+        title = QLabel(details.get("name", ""))
+        title.setObjectName("GameTitle")
+        layout.addWidget(title, alignment=Qt.AlignmentFlag.AlignLeft)
+
+        # ---- Header Image ----
+        if details.get("header_image"):
             try:
-                subprocess.Popen(path, shell=True)
+                pixmap = QPixmap()
+                pixmap.loadFromData(requests.get(details["header_image"]).content)
+                img = QLabel()
+                img.setPixmap(pixmap.scaledToWidth(600, Qt.TransformationMode.SmoothTransformation))
+                img.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                layout.addWidget(img)
             except Exception as e:
-                print(f"Failed to launch {path}: {e}")
+                print("[DEBUG] No se pudo cargar header_image:", e)
 
 
-    # --------------------------
-    # Open Settings Window
-    # --------------------------
+        # ---- Description ----
+        desc = QLabel(details.get("description", ""))
+        desc.setWordWrap(True)
+        desc.setObjectName("GameDescription")
+        layout.addWidget(desc)
+
+
+        desc = QLabel()
+        desc.setWordWrap(True)
+        desc.setObjectName("GameDescription")
+        desc.setTextFormat(Qt.TextFormat.RichText)
+
+        layout.addWidget(desc)
+
+        # ---- Metadata ----
+        meta_frame = QFrame()
+        meta_frame.setObjectName("InfoCard")
+        meta_layout = QVBoxLayout(meta_frame)
+
+        # ---- Genres ----
+        genres = []
+        genres_data = details.get("genres")
+
+        if isinstance(genres_data, list):
+            genres = [g.get("description", "") for g in genres_data if isinstance(g, dict)]
+        elif isinstance(genres_data, str):
+            genres = [genres_data]
+
+        if genres:
+            lbl = QLabel(t("genres.games") +  f":{', '.join(genres)}")
+            lbl.setObjectName("GameMeta")
+            meta_layout.addWidget(lbl)
+
+        # ---- Devs / Publishers ----
+        devs = details.get("developers") or []
+        if isinstance(devs, str):
+            devs = [devs]
+
+        pubs = details.get("publishers") or []
+        if isinstance(pubs, str):
+            pubs = [pubs]
+
+        if devs:
+            lbl = QLabel(t("developer") + f": {', '.join(devs)}")
+            lbl.setObjectName("GameMeta")
+            meta_layout.addWidget(lbl)
+
+        if pubs:
+            lbl = QLabel(t("publisher") + f": {', '.join(pubs)}")
+            lbl.setObjectName("GameMeta")
+            meta_layout.addWidget(lbl)
+
+        # ---- Release Date ----
+        release_text = None
+        release_data = details.get("release_date")
+
+        if isinstance(release_data, dict):
+            release_text = release_data.get("date")
+        elif isinstance(release_data, str):
+            release_text = release_data
+
+        if release_text:
+            lbl = QLabel(t("release.date") + f": {release_text}")
+            lbl.setObjectName("GameMeta")
+            meta_layout.addWidget(lbl)
+
+
+        layout.addWidget(meta_frame)
+
+     # Open Settings
     def open_settings_window(self):
         settings_window = SettingsWindow()
         settings_window.exec()
+
+    # Setup system tray
+    def setup_tray(self):
+        """Setup the system tray icon and menu."""
+        tray_menu = QMenu()
+        self.tray_icon.setToolTip("Avocado Game Launcher")
+
+        restore_action = QAction(t("title.restore"), self)
+        restore_action.triggered.connect(self.show)  # Open main window
+        tray_menu.addAction(restore_action)
+
+        quit_action = QAction(t("title.exit"), self)
+        quit_action.triggered.connect(QApplication.instance().quit)  # Close app
+        tray_menu.addAction(quit_action)
+
+        self.tray_icon.setContextMenu(tray_menu)
+        self.tray_icon.activated.connect(self.on_tray_icon_activated)
+        self.tray_icon.show()
+
+
+
+    def closeEvent(self, event):
+        """Minimize to tray or close app depending on settings."""
+        settings = load_settings()
+        if settings.get("tray_icon", False):
+            # Minimize to tray
+            event.ignore()
+            self.hide()
+            self.tray_icon.showMessage(
+                "Avocado Game Launcher",
+                t("msg.tray_info"),
+                QSystemTrayIcon.MessageIcon.Information,
+                3000
+            )
+        else:
+            # Close completely
+            event.accept()
+
+    def on_tray_icon_activated(self, reason):
+        """Restore window on tray double click."""
+        if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
+            self.show()
+            self.raise_()
+            self.activateWindow()

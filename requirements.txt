@@ -3,3 +3,4 @@ requests
 pyinstaller
 Pillow
 dotenv
+vdf
